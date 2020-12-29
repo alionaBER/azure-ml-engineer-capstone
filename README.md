@@ -15,21 +15,22 @@ All further resources are created programmatically.
 
 This project uses the data from a DrivenData competition - [Pump it Up: Data Mining the Water Table](https://www.drivendata.org/competitions/7/pump-it-up-data-mining-the-water-table/).
 
-The training data is divided into two files, with the target variable (labels), and the other variables (values). The target variable describe the functioning state of each waterpoint (*functional*, *functional need repair* and *non functional*). Descriptive variables inlude pump location, its founder, water quality and quantity, water point type, etc.
+The training data is divided into two files, with the target variable (labels), and the other variables (values). The target variable describe the functioning state of each waterpoint (*functional*, *functional need repair* and *non functional*). Descriptive variables include pump location, its founder, water quality and quantity, water point type, etc.
 
 ### Task
 
-The goal of the project is to provide users with a scoring API that receives input data about waterpoints and predicts its status. Detection of non functional and functional but requiring repair waterpoints allows prioritizing resources for maintainence. 
+The goal of the project is to provide users with a scoring API that receives input data about waterpoints and predicts its status. Detection of non functional and functional but requiring repair waterpoints allows prioritizing resources for maintenance. 
 
 ### Access
 
-Raw as well as pre-processed data was uploaded in Azure datastore and tabular dataset were created from them. The data used for training exists in the form of the registered dataset, which was used to profile and explore the data. Additionally, a file-type dataset was created for training in order to mount it during the Hyperdrive run.
+Raw as well as pre-processed data was uploaded in Azure datastore and tabular dataset were created from them. The data used for training exists in the form of the registered dataset, which was used to profile and explore the data. Additionally, a file-type dataset was created for training in order to mount it during the HyperDrive run.
 
 ## Automated ML
 
-The problem at hand is a multiclass classification. The fact of unbalanced dataset suggests against the often used accuracy metric. Among the available performance metrics in AutoML classification (see below), the weighted AUC was chosen.
+The problem at hand is a multiclass classification (`task = 'classification'`). The fact of unbalanced dataset suggests against the often used accuracy metric. Among the available performance metrics in AutoML classification (see below), the weighted AUC was chosen (`"primary_metric": 'AUC_weighted'`).
 
-Choice of the cloud compute target allows profiting from higher compute capabilities. Enabling early stopping saves computation time for prospectless children runs.
+Choice of the cloud compute target (`compute_target = cpu_cluster`) allows profiting from higher compute capabilities. Enabling early stopping (`"enable_early_stopping": True`) saves computation time for prospectless children runs. The training data from Datastore with a target variables are also specified within the AutoML configuration (`training_data = ds_joined,
+                               label_column_name = "status_group"`).
 
 
 ### Results
@@ -54,9 +55,10 @@ Various boosting approaches showed high performance during the AutoML training. 
 * learning rate (values between 0.01 and 1)
 * maximum depth (1, 3 or 5)
 
-The random search of the parameter space was chosen for its relative computational efficiency (in comparison to the Bayesian sampling) and the ability to explore the parameter space with both continuous and discrete values. The random sampling is compatible with the early stopping policy that has a potential of lowering computation time and costs. The performance metric is evaluated every time the script reports the metric and the Bandit policy is configured to terminate any training runs that are below the calculated value with the slack factor of 0.15 (see details in the [documentation](https://docs.microsoft.com/en-us/python/api/azureml-train-core/azureml.train.hyperdrive.banditpolicy?view=azure-ml-py)). A number of runs was configured to 12.
+The random search of the parameter space (`RandomParameterSampling`) was chosen for its relative computational efficiency (in comparison to the Bayesian sampling) and the ability to explore the parameter space with both continuous and discrete values. The random sampling is compatible with the early stopping policy (`BanditPolicy`) that has a potential of lowering computation time and costs. The performance metric is evaluated every time the script reports the metric and the Bandit policy is configured to terminate any training runs that are below the calculated value with the slack factor of 0.15 (see details in the [documentation](https://docs.microsoft.com/en-us/python/api/azureml-train-core/azureml.train.hyperdrive.banditpolicy?view=azure-ml-py)). 
+A number of runs was configured to 12 (`max_total_runs=12`).
 
-To achieve comparability with the AutoML models, weighted AUC was chosend as the target performance metric.
+To achieve comparability with the AutoML models, weighted AUC was chosen as the target performance metric (`primary_metric_name='AUC_weighted', primary_metric_goal=PrimaryMetricGoal.MAXIMIZE`).
 
 
 ### Results
@@ -69,19 +71,19 @@ The highest weighted AUC of 0.88 was achieved with the following hyperparameters
 
 ![Best model after hyperparameter tuning](images/hyperdrive_bestmodel.png)
 
-The parallel coordinate chart of model performance with various hyperparameters valuse (see below) suggest a few hypothesises that are worth evaluating for further model improvement:
+The parallel coordinate chart of model performance with various hyperparameters values (see below) suggest a few hypothesises that are worth evaluating for further model improvement:
 
 * Model performance is not very sensitive to number of boosting stages among the tested values (100, 200 and 500). The higher value tends to show better results and even higher values can be beneficial
 
 * Higher maximum depth seems to be associated with higher performance. Exploration of higher values is recommended.
 
-* Among tested values of learning rate mid-range values show better results. Exploration of a wider range can be benefitial.
+* Among tested values of learning rate mid-range values show better results. Exploration of a wider range can be beneficial.
 
-Overall, exploration of a larger number of runs, a higher number of hyperparameters and their broader ranges with Baysian sampling is likely to improve performance. However, as mentioned in the AutoML section, a benefit of EDA and feature engineering tends to be significant.
+Overall, exploration of a larger number of runs, a higher number of hyperparameters and their broader ranges with Bayesian sampling is likely to improve performance. However, as mentioned in the AutoML section, a benefit of EDA and feature engineering tends to be significant.
 
 ![Overview of HyperDrive run](images/hyperparameters.png)
 
-An overview of the models trained within the Hyperdrive show quite similar perfomance in terms of weighted AUC. 
+An overview of the models trained within the HyperDrive show quite similar performance in terms of weighted AUC. 
 
 ![Overview of HyperDrive run](images/hyperdrive_rundetails.png)
 
@@ -90,7 +92,7 @@ An overview of the models trained within the Hyperdrive show quite similar perfo
 
 The best AutoML model showed better performance and therefore is it deployed as a web service. 
 
-No authentication is activated on the endpoint, so one requires the URL and the format of the input data to send requests and receive predictions. A working expample can be found in the [notebook](automl.ipynb).
+No authentication is activated on the endpoint, so one requires the URL and the format of the input data to send requests and receive predictions. A working example can be found in the [notebook](automl.ipynb).
 
 Sample input:
 
@@ -150,3 +152,19 @@ This [screen recording](https://youtu.be/yRsvkm0L6RM)  gives a short overview of
 ## Standout Suggestions
 
 Enabled application insights for the scoring endpoint permit extended performance monitoring of the model API. Acting on performance monitoring results can significantly contribute to user experience of the model consumers (e.g. in terms of latency). 
+
+## Future work
+
+Independent of the modelling approach, deeper train data exploration and transformation has a potential to improve predictive performance and generate insights. Examples:
+
+* substitution of non-reliable data (0,0 for latitude/longitude or 0 for the construction year) by missing data
+
+* custom treatment of missing data (e.g. possibly some values are implied by other variables)
+
+* tackle unbalanced data (currently the largest class is represented by over a half of training examples and the smallest class just by 7%)
+
+* determine whether there are variables with (almost) identical information and possibly exclude such close duplicates
+
+It is worth spending more time to reconsider the target performance metric. A conversation with the *owners* of the problem at hand (prediction of waterpoint state) who are also future users of the model could sharpen the understanding of the relevant aspects of model performance. As AutoML has only a limited number of available metrics, a hyperparameter tuning approach could become preferable for this matter.
+
+The hyperparameter tuning approach has a wide range of possibilities to explore further, please refer to the [section above](#hyperparameter-tuning).
